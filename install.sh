@@ -21,8 +21,13 @@ REPO_BRANCH="main"
 
 INSTALL_DIR="/opt/vps-traffic-dashboard"
 SERVICE_NAME="vps-dashboard"
-GUNICORN_BIND_PORT="8000"          # internal, gunicorn only listens on 127.0.0.1
 SSL_DIR="/etc/vps-dashboard/ssl"
+
+# Internal gunicorn port - picked randomly in the 20000-29999 range so it
+# can never collide with whatever external port the user chooses below
+# (external ports are picked from 10000-65535). Kept out of that range
+# entirely on purpose, then double-checked for collision anyway.
+GUNICORN_BIND_PORT=$(( (RANDOM % 10000) + 20000 ))
 
 # ---------- helpers ----------
 c_reset="\033[0m"; c_bold="\033[1m"; c_green="\033[32m"; c_red="\033[31m"; c_blue="\033[34m"
@@ -179,7 +184,7 @@ log "Picking a random external port for the dashboard (avoids the obvious 443/84
 RANDOM_PORT=""
 for _ in 1 2 3 4 5; do
   candidate=$(( (RANDOM % 55536) + 10000 ))   # 10000-65535 range
-  if ! ss -tln 2>/dev/null | awk '{print $4}' | grep -q ":${candidate}\$"; then
+  if [ "$candidate" != "$GUNICORN_BIND_PORT" ] && ! ss -tln 2>/dev/null | awk '{print $4}' | grep -q ":${candidate}\$"; then
     RANDOM_PORT="$candidate"
     break
   fi
@@ -187,7 +192,14 @@ done
 [ -z "$RANDOM_PORT" ] && RANDOM_PORT=$(( (RANDOM % 55536) + 10000 ))
 
 ok "Suggested port: $RANDOM_PORT (currently free on this server)"
-ask "External port to access the dashboard on (HTTPS) - press Enter to accept the suggestion, or type your own" EXTERNAL_PORT "$RANDOM_PORT"
+while true; do
+  ask "External port to access the dashboard on (HTTPS) - press Enter to accept the suggestion, or type your own" EXTERNAL_PORT "$RANDOM_PORT"
+  if [ "$EXTERNAL_PORT" = "$GUNICORN_BIND_PORT" ]; then
+    err "Port $EXTERNAL_PORT is reserved internally, pick a different one."
+    continue
+  fi
+  break
+done
 
 # ============================================================
 # 6. Monthly traffic limit
@@ -422,7 +434,7 @@ After=network.target
 [Service]
 User=root
 WorkingDirectory=${INSTALL_DIR}
-Environment="PATH=${INSTALL_DIR}/venv/bin"
+Environment="PATH=${INSTALL_DIR}/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=${INSTALL_DIR}/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:${GUNICORN_BIND_PORT} app:app
 Restart=always
 RestartSec=3
