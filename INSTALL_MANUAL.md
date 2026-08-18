@@ -81,10 +81,10 @@ Expected response (dashboard is login-protected):
 
 ```
 HTTP/1.1 302 FOUND
-Location: /login?next=%2F
+Location: /dashboard
 ```
 
-Open `http://YOUR_SERVER_IP:8000/login` in a browser and sign in.
+Open `http://YOUR_SERVER_IP:8000/dashboard` in a browser and sign in.
 
 ## Debugging checklist
 
