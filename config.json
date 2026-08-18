@@ -1,0 +1,12 @@
+{
+  "dashboard_name": "Traffic Dashboard",
+  "monthly_limit_gb": 250,
+  "overage_price": 1800,
+  "currency": "Toman",
+  "interface": "",
+  "billing_start_day": 1,
+  "vps_expiration_date": "",
+  "secret_key": "REPLACE_WITH_A_LONG_RANDOM_SECRET",
+  "language": "en",
+  "dashboard_path": "dashboard"
+}

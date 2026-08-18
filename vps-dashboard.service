@@ -1,0 +1,14 @@
+[Unit]
+Description=VPS Traffic Dashboard
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/opt/vps-traffic-dashboard
+Environment="PATH=/opt/vps-traffic-dashboard/venv/bin"
+ExecStart=/opt/vps-traffic-dashboard/venv/bin/gunicorn --workers 2 --bind 0.0.0.0:8000 app:app
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

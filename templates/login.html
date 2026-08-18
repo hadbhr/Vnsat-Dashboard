@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Login - Traffic Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}" />
+  <script>
+    /* Set theme before first paint to avoid a flash of the wrong theme. */
+    (function () {
+      try {
+        var saved = localStorage.getItem("dashboard_theme") || "light";
+        document.documentElement.setAttribute("data-theme", saved);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+</head>
+<body dir="ltr">
+  <div class="login-topbar">
+    <div class="lang-select-wrap">
+      <select class="lang-select" id="langSelect" aria-label="Language">
+        <option value="en">English</option>
+        <option value="fa">فارسی</option>
+        <option value="zh">中文</option>
+        <option value="ru">Русский</option>
+      </select>
+    </div>
+    <button class="icon-btn" id="themeBtn" type="button" title="Toggle theme">&#9789;</button>
+  </div>
+
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2 L4 6 v6 c0 5 3.5 9 8 10 4.5 -1 8 -5 8 -10 V6 Z"/>
+          <path d="M9 12 l2 2 4 -4"/>
+        </svg>
+      </div>
+      <h1 id="loginTitle">Traffic Dashboard</h1>
+      <p class="subtitle" id="loginSubtitle">Sign in to view VPS traffic usage</p>
+
+      {% if error %}
+      <div class="login-error" id="loginError">Invalid username or password</div>
+      {% endif %}
+
+      <form method="POST" action="" autocomplete="off">
+        <div class="field">
+          <label for="username" id="lblUsername">Username</label>
+          <input type="text" id="username" name="username" autocomplete="username" required autofocus />
+        </div>
+        <div class="field">
+          <label for="password" id="lblPassword">Password</label>
+          <input type="password" id="password" name="password" autocomplete="current-password" required />
+        </div>
+        <button type="submit" class="btn btn-primary" id="btnSignIn">Sign In</button>
+      </form>
+
+      <div class="login-footer" id="loginFooter">Private dashboard &middot; authorized access only</div>
+    </div>
+  </div>
+
+  <script>
+    const LANG_CYCLE = ["en", "fa", "zh", "ru"];
+    const RTL_LANGS = ["fa"];
+
+    const LOGIN_TRANSLATIONS = {
+      en: {
+        title: "Traffic Dashboard",
+        subtitle: "Sign in to view VPS traffic usage",
+        username: "Username",
+        password: "Password",
+        signIn: "Sign In",
+        footer: "Private dashboard \u00b7 authorized access only",
+        error: "Invalid username or password",
+      },
+      fa: {
+        title: "داشبورد ترافیک",
+        subtitle: "برای مشاهده‌ی مصرف ترافیک سرور وارد شوید",
+        username: "نام کاربری",
+        password: "رمز عبور",
+        signIn: "ورود",
+        footer: "داشبورد خصوصی \u00b7 فقط برای دسترسی مجاز",
+        error: "نام کاربری یا رمز عبور اشتباه است",
+      },
+      zh: {
+        title: "流量仪表盘",
+        subtitle: "登录以查看 VPS 流量使用情况",
+        username: "用户名",
+        password: "密码",
+        signIn: "登录",
+        footer: "私有面板 \u00b7 仅限授权访问",
+        error: "用户名或密码不正确",
+      },
+      ru: {
+        title: "Панель трафика",
+        subtitle: "Войдите, чтобы увидеть использование трафика VPS",
+        username: "Имя пользователя",
+        password: "Пароль",
+        signIn: "Войти",
+        footer: "Приватная панель \u00b7 только для авторизованного доступа",
+        error: "Неверное имя пользователя или пароль",
+      },
+    };
+
+    let lang = localStorage.getItem("dashboard_lang") || "en";
+    if (!LANG_CYCLE.includes(lang)) lang = "en";
+
+    function t(key) {
+      return (LOGIN_TRANSLATIONS[lang] && LOGIN_TRANSLATIONS[lang][key]) || LOGIN_TRANSLATIONS.en[key];
+    }
+
+    function applyLoginLanguage() {
+      const isRtl = RTL_LANGS.includes(lang);
+      document.body.setAttribute("dir", isRtl ? "rtl" : "ltr");
+      document.getElementById("langSelect").value = lang;
+      document.getElementById("loginTitle").textContent = t("title");
+      document.title = t("title");
+      document.getElementById("loginSubtitle").textContent = t("subtitle");
+      document.getElementById("lblUsername").textContent = t("username");
+      document.getElementById("lblPassword").textContent = t("password");
+      document.getElementById("btnSignIn").textContent = t("signIn");
+      document.getElementById("loginFooter").textContent = t("footer");
+      const errEl = document.getElementById("loginError");
+      if (errEl) errEl.textContent = t("error");
+    }
+
+    function setLoginLanguage(newLang) {
+      if (!LANG_CYCLE.includes(newLang)) return;
+      lang = newLang;
+      localStorage.setItem("dashboard_lang", lang);
+      applyLoginLanguage();
+    }
+
+    function applyLoginTheme(theme) {
+      document.documentElement.setAttribute("data-theme", theme);
+      document.getElementById("themeBtn").innerHTML = theme === "light" ? "&#9728;" : "&#9789;";
+    }
+
+    function toggleLoginTheme() {
+      const current = localStorage.getItem("dashboard_theme") || "light";
+      const next = current === "light" ? "dark" : "light";
+      localStorage.setItem("dashboard_theme", next);
+      applyLoginTheme(next);
+    }
+
+    document.getElementById("langSelect").addEventListener("change", (e) => setLoginLanguage(e.target.value));
+    document.getElementById("themeBtn").addEventListener("click", toggleLoginTheme);
+
+    applyLoginTheme(localStorage.getItem("dashboard_theme") || "light");
+    applyLoginLanguage();
+  </script>
+</body>
+</html>

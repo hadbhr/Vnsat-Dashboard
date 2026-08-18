@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>Traffic Dashboard</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}" />
+<script>
+  /* Set theme before first paint to avoid a flash of the wrong theme. */
+  (function () {
+    try {
+      var saved = localStorage.getItem("dashboard_theme") || "light";
+      document.documentElement.setAttribute("data-theme", saved);
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", "light");
+    }
+  })();
+</script>
+</head>
+<body dir="ltr" data-initial-lang="{{ initial_lang }}" data-dashboard-path="{{ dashboard_path }}">
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-title">
+      <h1><span id="dashTitle">Traffic Dashboard</span> <span class="live-dot" title="Live"></span></h1>
+      <div class="subtitle" id="dashSubtitle">VPS traffic usage</div>
+    </div>
+    <div class="header-actions">
+      <div class="lang-select-wrap">
+        <select class="lang-select" id="langSelect" aria-label="Language">
+          <option value="en">English</option>
+          <option value="fa">فارسی</option>
+          <option value="zh">中文</option>
+          <option value="ru">Русский</option>
+        </select>
+      </div>
+      <button class="icon-btn" id="settingsBtn" type="button" title="Settings">&#9881;</button>
+      <button class="icon-btn" id="themeBtn" type="button" title="Toggle theme">&#9789;</button>
+      <a class="icon-btn logout-btn" href="{{ url_for('logout') }}" title="Logout">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </a>
+    </div>
+  </div>
+
+  <div class="error-banner" id="errorBanner"></div>
+
+  <!-- HERO: MONTHLY USAGE - always in focus, top of page -->
+  <div class="hero-card">
+    <div class="hero-top">
+      <div>
+        <div class="hero-label" id="lblDownload">Download</div>
+        <div class="hero-value" id="downloadValue">0 <small>GB</small></div>
+      </div>
+      <div class="hero-percent" id="downloadPercent">0%</div>
+    </div>
+    <div class="hero-track">
+      <div class="hero-fill" id="downloadBar" style="width:0%"></div>
+    </div>
+    <div class="hero-meta">
+      <span id="downloadRatio">0 / 0 GB</span>
+    </div>
+  </div>
+
+  <!-- USAGE CARDS (upload + remaining) -->
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-label"><span id="lblUpload">Upload</span></div>
+      <div class="card-value" id="uploadValue">0 GB</div>
+      <div class="card-sub" id="lblThisMonth">This month</div>
+    </div>
+    <div class="card">
+      <div class="card-label"><span id="lblRemaining">Remaining</span></div>
+      <div class="card-value" id="remainingValue">0 GB</div>
+      <div class="card-sub" id="lblOfLimit">of monthly limit</div>
+    </div>
+  </div>
+
+  <!-- STATISTICS (max 2 boxes per row) -->
+  <div class="section grid grid-4">
+    <div class="card stat-card">
+      <div class="card-label"><span id="lblToday">Today</span></div>
+      <div class="stat-pair"><span class="k" id="lblDownShort1">DL</span><span class="v" id="todayDown">0 GB</span></div>
+      <div class="stat-pair"><span class="k" id="lblUpShort1">UL</span><span class="v" id="todayUp">0 GB</span></div>
+    </div>
+    <div class="card stat-card">
+      <div class="card-label"><span id="lblYesterday">Yesterday</span></div>
+      <div class="stat-pair"><span class="k" id="lblDownShort2">DL</span><span class="v" id="yesterdayDown">0 GB</span></div>
+      <div class="stat-pair"><span class="k" id="lblUpShort2">UL</span><span class="v" id="yesterdayUp">0 GB</span></div>
+    </div>
+  </div>
+
+  <div class="section grid grid-2">
+    <div class="card">
+      <div class="card-label"><span id="lblOverage">Overage</span></div>
+      <div class="card-value" id="overageValue">0 GB</div>
+      <div class="card-sub" id="overageCost">0</div>
+    </div>
+    <div class="card">
+      <div class="card-label" id="lblBillingCard">Billing</div>
+      <div class="billing-grid" style="margin-top:8px;">
+        <div class="billing-item">
+          <div class="card-label" id="lblBillingStart" style="font-size:11px;">Billing started</div>
+          <div class="card-value" id="billingStart" style="font-size:14px;">--</div>
+        </div>
+        <div class="billing-item">
+          <div class="card-label" id="lblNextReset" style="font-size:11px;">Next reset</div>
+          <div class="card-value" id="billingReset" style="font-size:14px;">--</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHART + HISTORY - top-level tabs, each panel has its own range tabs -->
+  <div class="section card">
+    <div class="panel-tabs">
+      <button class="panel-tab active" data-panel="chart" id="panelTabChart">Traffic Chart</button>
+      <button class="panel-tab" data-panel="history" id="panelTabHistory">History</button>
+    </div>
+
+    <div class="panel-view active" id="panelViewChart">
+      <div class="chart-tabs">
+        <button class="chart-tab" data-crange="hourly" id="tabHourly">Hourly</button>
+        <button class="chart-tab active" data-crange="daily" id="tabDaily">Daily</button>
+        <button class="chart-tab" data-crange="weekly" id="tabWeekly">Weekly</button>
+        <button class="chart-tab" data-crange="monthly" id="tabMonthly">Monthly</button>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="trafficChart"></canvas>
+      </div>
+      <div class="legend">
+        <span><span class="legend-dot" style="background:var(--accent)"></span><span id="legendDownload">Download</span></span>
+        <span><span class="legend-dot" style="background:var(--green)"></span><span id="legendUpload">Upload</span></span>
+      </div>
+    </div>
+
+    <div class="panel-view" id="panelViewHistory">
+      <div class="chart-tabs">
+        <button class="chart-tab" data-hrange="hourly" id="histTabHourly">Hourly</button>
+        <button class="chart-tab active" data-hrange="daily" id="histTabDaily">Daily</button>
+        <button class="chart-tab" data-hrange="weekly" id="histTabWeekly">Weekly</button>
+        <button class="chart-tab" data-hrange="monthly" id="histTabMonthly">Monthly</button>
+      </div>
+      <table class="history-table" id="dailyHistoryTable">
+        <thead>
+          <tr>
+            <th id="lblColDate">Date</th>
+            <th id="lblColDownload">Download</th>
+            <th id="lblColUpload">Upload</th>
+          </tr>
+        </thead>
+        <tbody id="dailyHistoryBody"></tbody>
+      </table>
+      <div class="history-empty" id="dailyHistoryEmpty" style="display:none;">No data available</div>
+    </div>
+  </div>
+
+  <div class="footer" id="footerText">VPS Traffic Dashboard</div>
+</div>
+
+<!-- SETTINGS MODAL (single instance, static markup) -->
+<div class="modal-backdrop hidden" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="lblSettingsTitle">Settings</h2>
+      <button class="modal-close" id="settingsCloseBtn" type="button">&times;</button>
+    </div>
+
+    <div class="form-msg" id="settingsMsg"></div>
+
+    <div class="field">
+      <label id="lblSettingName">Dashboard Name</label>
+      <input type="text" id="settingName" />
+    </div>
+    <div class="field">
+      <label id="lblSettingLimit">Monthly Traffic Limit (GB)</label>
+      <input type="number" id="settingLimit" min="1" step="0.01" />
+    </div>
+    <div class="field">
+      <label id="lblSettingPrice">Overage Price (per GB)</label>
+      <input type="number" id="settingPrice" min="0" step="0.01" />
+    </div>
+    <div class="field">
+      <label id="lblSettingCurrency">Currency</label>
+      <div class="select-wrap">
+        <select id="settingCurrency">
+          <option value="USD">USD</option>
+          <option value="Toman">Toman</option>
+          <option value="RUB">RUB</option>
+          <option value="CNY">CNY</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label id="lblSettingExpiration">VPS Expiration Date</label>
+      <input type="date" id="settingExpiration" />
+      <div class="field-error" id="settingExpirationError"></div>
+    </div>
+    <div class="field">
+      <label id="lblSettingPath">Dashboard URL Path</label>
+      <input type="text" id="settingPath" placeholder="dashboard" />
+      <div class="field-hint" id="settingPathHint">https://your-server/&hellip;</div>
+      <div class="field-error" id="settingPathError"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="settingsCancelBtn" type="button">Cancel</button>
+      <button class="btn btn-primary modal-save" id="settingsSaveBtn" type="button">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='chart.umd.min.js') }}"></script>
+<script>
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const REFRESH_INTERVAL_MS = 30000;
+const API_TRAFFIC = "/api/traffic";
+const API_SETTINGS = "/api/settings";
+const LANG_CYCLE = ["en", "fa", "zh", "ru"];
+const RTL_LANGS = ["fa"];
+
+const initialLangFromServer = document.body.getAttribute("data-initial-lang") || "en";
+
+let STATE = {
+  lang: localStorage.getItem("dashboard_lang") || (LANG_CYCLE.includes(initialLangFromServer) ? initialLangFromServer : "en"),
+  theme: localStorage.getItem("dashboard_theme") || "light",
+  chartRange: "daily",
+  historyRange: "daily",
+  activePanel: "chart",
+  lastData: null,
+  currency: "USD",
+  dashboardPath: document.body.getAttribute("data-dashboard-path") || "dashboard",
+};
+
+/* ============================================================
+   TRANSLATIONS
+   ============================================================ */
+const TRANSLATIONS = {
+  en: {
+    unit: "GB",
+    subtitle: "VPS traffic usage",
+    download: "Download",
+    upload: "Upload",
+    thisMonth: "This month",
+    remaining: "Remaining",
+    remainingInline: "remaining",
+    ofLimit: "of monthly limit",
+    today: "Today",
+    yesterday: "Yesterday",
+    overage: "Overage",
+    dl: "DL",
+    ul: "UL",
+    billingCard: "Billing",
+    billingStart: "Billing started",
+    nextReset: "Next reset",
+    hourly: "Hourly",
+    daily: "Daily",
+    weekly: "Weekly",
+    monthly: "Monthly",
+    chartCard: "Traffic Chart",
+    dailyHistory: "History",
+    colDate: "Date",
+    colDownload: "Download",
+    colUpload: "Upload",
+    noData: "No data available",
+    settings: "Settings",
+    settingName: "Dashboard Name",
+    settingLimit: "Monthly Traffic Limit (GB)",
+    settingPrice: "Overage Price (per GB)",
+    settingCurrency: "Currency",
+    settingExpiration: "VPS Expiration Date",
+    settingPath: "Dashboard URL Path",
+    settingPathHint: "Access the dashboard at this custom URL",
+    dateInPast: "Enter a valid date - it cannot be in the past",
+    dateInvalid: "Enter a valid date",
+    pathInvalid: "Use only letters, numbers, - or _ (3-32 characters)",
+    pathReserved: "This path is reserved, choose another one",
+    cancel: "Cancel",
+    save: "Save",
+    saveSuccess: "Settings saved successfully",
+    footer: "VPS Traffic Dashboard",
+    loadError: "Unable to load traffic data",
+    nameRequired: "Dashboard name must not be empty",
+    limitInvalid: "Monthly limit must be greater than 0",
+    priceInvalid: "Overage price must be 0 or greater",
+  },
+  fa: {
+    unit: "گیگ",
+    subtitle: "میزان مصرف ترافیک سرور",
+    download: "دانلود",
+    upload: "آپلود",
+    thisMonth: "این ماه",
+    remaining: "باقیمانده",
+    remainingInline: "باقیمانده",
+    ofLimit: "از سقف ماهانه",
+    today: "امروز",
+    yesterday: "دیروز",
+    overage: "مازاد مصرف",
+    dl: "دانلود",
+    ul: "آپلود",
+    billingCard: "صورتحساب",
+    billingStart: "شروع دوره",
+    nextReset: "بازنشانی بعدی",
+    hourly: "ساعتی",
+    daily: "روزانه",
+    weekly: "هفتگی",
+    monthly: "ماهانه",
+    chartCard: "نمودار ترافیک",
+    dailyHistory: "تاریخچه",
+    colDate: "تاریخ",
+    colDownload: "دانلود",
+    colUpload: "آپلود",
+    noData: "داده‌ای موجود نیست",
+    settings: "تنظیمات",
+    settingName: "نام داشبورد",
+    settingLimit: "سقف ترافیک ماهانه (گیگابایت)",
+    settingPrice: "قیمت هر گیگابایت مازاد",
+    settingCurrency: "واحد پول",
+    settingExpiration: "تاریخ انقضای سرور",
+    settingPath: "مسیر URL داشبورد",
+    settingPathHint: "داشبورد از این آدرس اختصاصی در دسترسه",
+    dateInPast: "یه تاریخ معتبر وارد کن - نمی‌تونه در گذشته باشه",
+    dateInvalid: "یه تاریخ معتبر وارد کن",
+    pathInvalid: "فقط حروف، عدد، - یا _ استفاده کن (۳ تا ۳۲ کاراکتر)",
+    pathReserved: "این مسیر رزرو شده، یه مسیر دیگه انتخاب کن",
+    cancel: "انصراف",
+    save: "ذخیره",
+    saveSuccess: "تنظیمات با موفقیت ذخیره شد",
+    footer: "داشبورد ترافیک سرور",
+    loadError: "خطا در دریافت اطلاعات ترافیک",
+    nameRequired: "نام داشبورد نمی‌تواند خالی باشد",
+    limitInvalid: "سقف ماهانه باید بزرگتر از صفر باشد",
+    priceInvalid: "قیمت مازاد باید صفر یا بیشتر باشد",
+  },
+  zh: {
+    unit: "GB",
+    subtitle: "VPS 流量使用情况",
+    download: "下载",
+    upload: "上传",
+    thisMonth: "本月",
+    remaining: "剩余",
+    remainingInline: "剩余",
+    ofLimit: "占月流量上限",
+    today: "今天",
+    yesterday: "昨天",
+    overage: "超出流量",
+    dl: "下载",
+    ul: "上传",
+    billingCard: "账单",
+    billingStart: "计费开始",
+    nextReset: "下次重置",
+    hourly: "每小时",
+    daily: "每日",
+    weekly: "每周",
+    monthly: "每月",
+    chartCard: "流量图表",
+    dailyHistory: "历史记录",
+    colDate: "日期",
+    colDownload: "下载",
+    colUpload: "上传",
+    noData: "暂无数据",
+    settings: "设置",
+    settingName: "面板名称",
+    settingLimit: "每月流量上限（GB）",
+    settingPrice: "超额单价（每GB）",
+    settingCurrency: "货币",
+    settingExpiration: "VPS 到期日期",
+    settingPath: "面板 URL 路径",
+    settingPathHint: "通过此自定义网址访问面板",
+    dateInPast: "请输入有效日期 - 不能是过去的日期",
+    dateInvalid: "请输入有效日期",
+    pathInvalid: "只能使用字母、数字、- 或 _（3-32个字符）",
+    pathReserved: "该路径已被保留，请选择其他路径",
+    cancel: "取消",
+    save: "保存",
+    saveSuccess: "设置已成功保存",
+    footer: "VPS 流量仪表盘",
+    loadError: "无法加载流量数据",
+    nameRequired: "面板名称不能为空",
+    limitInvalid: "月流量上限必须大于0",
+    priceInvalid: "超额单价必须大于或等于0",
+  },
+  ru: {
+    unit: "GB",
+    subtitle: "Использование трафика VPS",
+    download: "Загрузка",
+    upload: "Отдача",
+    thisMonth: "В этом месяце",
+    remaining: "Осталось",
+    remainingInline: "осталось",
+    ofLimit: "от месячного лимита",
+    today: "Сегодня",
+    yesterday: "Вчера",
+    overage: "Перерасход",
+    dl: "Вход.",
+    ul: "Исх.",
+    billingCard: "Биллинг",
+    billingStart: "Начало периода",
+    nextReset: "Следующий сброс",
+    hourly: "Почасово",
+    daily: "По дням",
+    weekly: "По неделям",
+    monthly: "По месяцам",
+    chartCard: "График трафика",
+    dailyHistory: "История",
+    colDate: "Дата",
+    colDownload: "Загрузка",
+    colUpload: "Отдача",
+    noData: "Нет данных",
+    settings: "Настройки",
+    settingName: "Название панели",
+    settingLimit: "Месячный лимит трафика (ГБ)",
+    settingPrice: "Цена за перерасход (за ГБ)",
+    settingCurrency: "Валюта",
+    settingExpiration: "Дата истечения VPS",
+    settingPath: "URL-путь панели",
+    settingPathHint: "Доступ к панели по этому адресу",
+    dateInPast: "Введите корректную дату - она не может быть в прошлом",
+    dateInvalid: "Введите корректную дату",
+    pathInvalid: "Используйте только буквы, цифры, - или _ (3-32 символа)",
+    pathReserved: "Этот путь зарезервирован, выберите другой",
+    cancel: "Отмена",
+    save: "Сохранить",
+    saveSuccess: "Настройки успешно сохранены",
+    footer: "Панель трафика VPS",
+    loadError: "Не удалось загрузить данные о трафике",
+    nameRequired: "Название панели не может быть пустым",
+    limitInvalid: "Месячный лимит должен быть больше 0",
+    priceInvalid: "Цена за перерасход должна быть 0 или больше",
+  },
+};
+
+function t(key) {
+  const dict = TRANSLATIONS[STATE.lang] || TRANSLATIONS.en;
+  return dict[key] !== undefined ? dict[key] : TRANSLATIONS.en[key];
+}
+
+/* ============================================================
+   LANGUAGE
+   ============================================================ */
+function applyLanguage() {
+  const isRtl = RTL_LANGS.includes(STATE.lang);
+  document.body.setAttribute("dir", isRtl ? "rtl" : "ltr");
+  document.getElementById("langSelect").value = STATE.lang;
+
+  document.getElementById("dashSubtitle").textContent = t("subtitle");
+  document.getElementById("lblDownload").textContent = t("download");
+  document.getElementById("lblUpload").textContent = t("upload");
+  document.getElementById("lblThisMonth").textContent = t("thisMonth");
+  document.getElementById("lblRemaining").textContent = t("remaining");
+  document.getElementById("lblOfLimit").textContent = t("ofLimit");
+  document.getElementById("lblToday").textContent = t("today");
+  document.getElementById("lblYesterday").textContent = t("yesterday");
+  document.getElementById("lblOverage").textContent = t("overage");
+  document.getElementById("lblDownShort1").textContent = t("dl");
+  document.getElementById("lblUpShort1").textContent = t("ul");
+  document.getElementById("lblDownShort2").textContent = t("dl");
+  document.getElementById("lblUpShort2").textContent = t("ul");
+  document.getElementById("lblBillingCard").textContent = t("billingCard");
+  document.getElementById("lblBillingStart").textContent = t("billingStart");
+  document.getElementById("lblNextReset").textContent = t("nextReset");
+  document.getElementById("tabHourly").textContent = t("hourly");
+  document.getElementById("tabDaily").textContent = t("daily");
+  document.getElementById("tabWeekly").textContent = t("weekly");
+  document.getElementById("tabMonthly").textContent = t("monthly");
+  document.getElementById("histTabHourly").textContent = t("hourly");
+  document.getElementById("histTabDaily").textContent = t("daily");
+  document.getElementById("histTabWeekly").textContent = t("weekly");
+  document.getElementById("histTabMonthly").textContent = t("monthly");
+  document.getElementById("panelTabChart").textContent = t("chartCard");
+  document.getElementById("panelTabHistory").textContent = t("dailyHistory");
+  document.getElementById("legendDownload").textContent = t("download");
+  document.getElementById("legendUpload").textContent = t("upload");
+  document.getElementById("lblColDate").textContent = t("colDate");
+  document.getElementById("lblColDownload").textContent = t("colDownload");
+  document.getElementById("lblColUpload").textContent = t("colUpload");
+  document.getElementById("dailyHistoryEmpty").textContent = t("noData");
+  document.getElementById("lblSettingsTitle").textContent = t("settings");
+  document.getElementById("lblSettingName").textContent = t("settingName");
+  document.getElementById("lblSettingLimit").textContent = t("settingLimit");
+  document.getElementById("lblSettingPrice").textContent = t("settingPrice");
+  document.getElementById("lblSettingCurrency").textContent = t("settingCurrency");
+  document.getElementById("lblSettingExpiration").textContent = t("settingExpiration");
+  document.getElementById("lblSettingPath").textContent = t("settingPath");
+  document.getElementById("settingPathHint").textContent = t("settingPathHint");
+  document.getElementById("settingsCancelBtn").textContent = t("cancel");
+  document.getElementById("settingsSaveBtn").textContent = t("save");
+  document.getElementById("footerText").textContent = t("footer");
+
+  if (STATE.lastData) {
+    renderAll(STATE.lastData);
+  }
+}
+
+function setLanguage(lang) {
+  if (!LANG_CYCLE.includes(lang)) return;
+  STATE.lang = lang;
+  localStorage.setItem("dashboard_lang", STATE.lang);
+  applyLanguage();
+  renderChart();
+}
+
+/* ============================================================
+   THEME
+   ============================================================ */
+function applyTheme() {
+  if (STATE.theme === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
+    document.getElementById("themeBtn").innerHTML = "&#9728;";
+  } else {
+    document.documentElement.setAttribute("data-theme", "dark");
+    document.getElementById("themeBtn").innerHTML = "&#9789;";
+  }
+}
+
+function toggleTheme() {
+  STATE.theme = STATE.theme === "dark" ? "light" : "dark";
+  localStorage.setItem("dashboard_theme", STATE.theme);
+  applyTheme();
+  renderChart();
+}
+
+/* ============================================================
+   FORMATTERS
+   ============================================================ */
+function localeForLang() {
+  switch (STATE.lang) {
+    case "fa": return "fa-IR";
+    case "zh": return "zh-CN";
+    case "ru": return "ru-RU";
+    default: return "en-US";
+  }
+}
+
+function formatGb(value) {
+  const n = Number(value) || 0;
+  return n.toLocaleString(localeForLang(), {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }) + " " + t("unit");
+}
+
+function formatNumber(value) {
+  const n = Number(value) || 0;
+  return n.toLocaleString(localeForLang(), {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatCurrency(amount, currency) {
+  const n = Number(amount) || 0;
+  const locale = localeForLang();
+  switch (currency) {
+    case "USD":
+      return "$" + n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    case "RUB":
+      return n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " RUB";
+    case "CNY":
+      return "¥" + n.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    case "Toman":
+    default:
+      return n.toLocaleString(locale, { maximumFractionDigits: 0 }) + " " + (currency || "Toman");
+  }
+}
+
+/* ============================================================
+   RENDER STATS
+   ============================================================ */
+function renderAll(data) {
+  document.getElementById("dashTitle").textContent = data.dashboard_name || "Traffic Dashboard";
+
+  const dl = data.download || {};
+  const ul = data.upload || {};
+
+  document.getElementById("downloadValue").innerHTML = formatNumber(dl.month_gb) + " <small>" + t("unit") + "</small>";
+  document.getElementById("uploadValue").textContent = formatGb(ul.month_gb);
+
+  const limit = Number(dl.limit_gb) || 0;
+  const used = Number(dl.month_gb) || 0;
+  const pct = limit > 0 ? (used / limit) * 100 : 0;
+  const barPct = Math.min(100, Math.max(0, pct));
+  const isWarn = pct >= 90;
+
+  const bar = document.getElementById("downloadBar");
+  bar.style.width = barPct + "%";
+  bar.classList.toggle("warn", isWarn);
+
+  const percentEl = document.getElementById("downloadPercent");
+  percentEl.textContent = Math.round(pct) + "%";
+  percentEl.classList.toggle("warn", isWarn);
+
+  document.getElementById("downloadRatio").textContent =
+    formatNumber(used) + " / " + formatNumber(limit) + " " + t("unit");
+
+  document.getElementById("remainingValue").textContent = formatGb(dl.remaining_gb);
+
+  const today = data.today || {};
+  const yesterday = data.yesterday || {};
+  document.getElementById("todayDown").textContent = formatGb(today.download_gb);
+  document.getElementById("todayUp").textContent = formatGb(today.upload_gb);
+  document.getElementById("yesterdayDown").textContent = formatGb(yesterday.download_gb);
+  document.getElementById("yesterdayUp").textContent = formatGb(yesterday.upload_gb);
+
+  document.getElementById("overageValue").textContent = formatGb(dl.overage_gb);
+  document.getElementById("overageCost").textContent = formatCurrency(dl.overage_cost, dl.currency);
+  STATE.currency = dl.currency || "USD";
+
+  const billing = data.billing || {};
+  document.getElementById("billingStart").textContent = billing.start_date || "--";
+  document.getElementById("billingReset").textContent = billing.reset_date || "--";
+
+  renderHistoryTable();
+  renderChart();
+}
+
+/* ============================================================
+   HISTORY (own tabs, independent of chart tabs)
+   ============================================================ */
+function getHistorySource(range) {
+  const data = STATE.lastData;
+  if (!data) return { rows: [], labelKey: "date" };
+
+  if (range === "hourly") return { rows: data.hourly_history || [], labelKey: "label" };
+  if (range === "daily") return { rows: data.daily_history || [], labelKey: "date" };
+  if (range === "weekly") return { rows: data.weekly_history || [], labelKey: "week" };
+  if (range === "monthly") return { rows: data.monthly_history || [], labelKey: "label" };
+  return { rows: [], labelKey: "date" };
+}
+
+function renderHistoryTable() {
+  const { rows, labelKey } = getHistorySource(STATE.historyRange);
+  const body = document.getElementById("dailyHistoryBody");
+  const empty = document.getElementById("dailyHistoryEmpty");
+  const table = document.getElementById("dailyHistoryTable");
+  body.innerHTML = "";
+
+  if (!rows || rows.length === 0) {
+    table.style.display = "none";
+    empty.style.display = "block";
+    return;
+  }
+
+  table.style.display = "table";
+  empty.style.display = "none";
+
+  const recent = rows.slice(-14).reverse();
+  recent.forEach((row) => {
+    const tr = document.createElement("tr");
+    const tdDate = document.createElement("td");
+    tdDate.textContent = row[labelKey] || "--";
+    const tdDl = document.createElement("td");
+    tdDl.textContent = formatGb(row.download_gb);
+    const tdUl = document.createElement("td");
+    tdUl.textContent = formatGb(row.upload_gb);
+    tr.appendChild(tdDate);
+    tr.appendChild(tdDl);
+    tr.appendChild(tdUl);
+    body.appendChild(tr);
+  });
+}
+
+function setChartRange(range) {
+  STATE.chartRange = range;
+  document.querySelectorAll("[data-crange]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.crange === range);
+  });
+  renderChart();
+}
+
+function setHistoryRange(range) {
+  STATE.historyRange = range;
+  document.querySelectorAll("[data-hrange]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.hrange === range);
+  });
+  renderHistoryTable();
+}
+
+function setPanel(panel) {
+  STATE.activePanel = panel;
+  document.querySelectorAll("[data-panel]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.panel === panel);
+  });
+  document.getElementById("panelViewChart").classList.toggle("active", panel === "chart");
+  document.getElementById("panelViewHistory").classList.toggle("active", panel === "history");
+  if (panel === "chart") renderChart();
+  if (panel === "history") renderHistoryTable();
+}
+
+/* ============================================================
+   CHART
+   ============================================================ */
+let chartInstance = null;
+
+function getChartLabelsAndData(range) {
+  const data = STATE.lastData;
+  if (!data) return { labels: [], dl: [], ul: [] };
+
+  let source = [];
+  let labelFn = (x) => x.date;
+
+  if (range === "hourly") {
+    source = data.hourly_history || [];
+    labelFn = (x) => x.label;
+  } else if (range === "daily") {
+    source = data.daily_history || [];
+    labelFn = (x) => x.date;
+  } else if (range === "weekly") {
+    source = data.weekly_history || [];
+    labelFn = (x) => x.week;
+  } else if (range === "monthly") {
+    source = data.monthly_history || [];
+    labelFn = (x) => x.label;
+  }
+
+  return {
+    labels: source.map(labelFn),
+    dl: source.map((x) => x.download_gb),
+    ul: source.map((x) => x.upload_gb),
+  };
+}
+
+function getThemeColors() {
+  const styles = getComputedStyle(document.documentElement);
+  return {
+    text: styles.getPropertyValue("--text").trim() || "#e8eaf0",
+    muted: styles.getPropertyValue("--muted").trim() || "#8b93a7",
+    border: styles.getPropertyValue("--border").trim() || "#232733",
+    accent: styles.getPropertyValue("--accent").trim() || "#4f8cff",
+    green: styles.getPropertyValue("--green").trim() || "#33c481",
+  };
+}
+
+function renderChart() {
+  if (!STATE.lastData || typeof Chart === "undefined") return;
+
+  const colors = getThemeColors();
+  const { labels, dl, ul } = getChartLabelsAndData(STATE.chartRange);
+  const ctx = document.getElementById("trafficChart").getContext("2d");
+
+  if (chartInstance) {
+    chartInstance.destroy();
+    chartInstance = null;
+  }
+
+  chartInstance = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: t("download"),
+          data: dl,
+          backgroundColor: colors.accent,
+          borderRadius: 4,
+          maxBarThickness: 22,
+        },
+        {
+          label: t("upload"),
+          data: ul,
+          backgroundColor: colors.green,
+          borderRadius: 4,
+          maxBarThickness: 22,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function (item) {
+              return item.dataset.label + ": " + formatGb(item.parsed.y);
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: colors.muted, font: { size: 10 } },
+          grid: { color: "transparent" },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: colors.muted, font: { size: 10 } },
+          grid: { color: colors.border },
+        },
+      },
+    },
+  });
+}
+
+/* ============================================================
+   SETTINGS (single implementation)
+   ============================================================ */
+const settingsModal = document.getElementById("settingsModal");
+const settingsMsg = document.getElementById("settingsMsg");
+
+function openSettings() {
+  settingsMsg.className = "form-msg";
+  settingsMsg.textContent = "";
+  loadSettingsIntoForm();
+  settingsModal.classList.remove("hidden");
+}
+
+function closeSettings() {
+  settingsModal.classList.add("hidden");
+}
+
+function loadSettingsIntoForm() {
+  fetch(API_SETTINGS, { cache: "no-store" })
+    .then((res) => {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    })
+    .then((cfg) => {
+      document.getElementById("settingName").value = cfg.dashboard_name || "";
+      document.getElementById("settingLimit").value = cfg.monthly_limit_gb || 0;
+      document.getElementById("settingPrice").value = cfg.overage_price || 0;
+      document.getElementById("settingCurrency").value = cfg.currency || "USD";
+      document.getElementById("settingExpiration").value = cfg.vps_expiration_date || "";
+      document.getElementById("settingPath").value = cfg.dashboard_path || "dashboard";
+      const todayStr = new Date().toISOString().slice(0, 10);
+      document.getElementById("settingExpiration").setAttribute("min", todayStr);
+    })
+    .catch((err) => {
+      showSettingsMessage(t("loadError") + ": " + err.message, "error");
+    });
+}
+
+function showSettingsMessage(msg, kind) {
+  settingsMsg.textContent = msg;
+  settingsMsg.className = "form-msg show " + kind;
+}
+
+function saveSettings() {
+  const name = document.getElementById("settingName").value.trim();
+  const limit = parseFloat(document.getElementById("settingLimit").value);
+  const price = parseFloat(document.getElementById("settingPrice").value);
+  const currency = document.getElementById("settingCurrency").value;
+  const expiration = document.getElementById("settingExpiration").value.trim();
+  const path = document.getElementById("settingPath").value.trim().replace(/^\/+/, "");
+
+  document.getElementById("settingExpirationError").classList.remove("show");
+  document.getElementById("settingPathError").classList.remove("show");
+
+  if (!name) {
+    showSettingsMessage(t("nameRequired"), "error");
+    return;
+  }
+  if (!(limit > 0)) {
+    showSettingsMessage(t("limitInvalid"), "error");
+    return;
+  }
+  if (!(price >= 0)) {
+    showSettingsMessage(t("priceInvalid"), "error");
+    return;
+  }
+
+  if (expiration) {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expiration) || isNaN(new Date(expiration).getTime())) {
+      const el = document.getElementById("settingExpirationError");
+      el.textContent = t("dateInvalid");
+      el.classList.add("show");
+      return;
+    }
+    if (expiration < todayStr) {
+      const el = document.getElementById("settingExpirationError");
+      el.textContent = t("dateInPast");
+      el.classList.add("show");
+      return;
+    }
+  }
+
+  if (path && !/^[A-Za-z0-9_-]{3,32}$/.test(path)) {
+    const el = document.getElementById("settingPathError");
+    el.textContent = t("pathInvalid");
+    el.classList.add("show");
+    return;
+  }
+
+  const pathChanged = path && path !== STATE.dashboardPath;
+
+  fetch(API_SETTINGS, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      dashboard_name: name,
+      monthly_limit_gb: limit,
+      overage_price: price,
+      currency: currency,
+      vps_expiration_date: expiration,
+      dashboard_path: path || undefined,
+    }),
+  })
+    .then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (body.error === "date_in_past") {
+          const el = document.getElementById("settingExpirationError");
+          el.textContent = t("dateInPast");
+          el.classList.add("show");
+          throw new Error(t("dateInPast"));
+        }
+        if (body.error === "invalid_date") {
+          const el = document.getElementById("settingExpirationError");
+          el.textContent = t("dateInvalid");
+          el.classList.add("show");
+          throw new Error(t("dateInvalid"));
+        }
+        if (body.error === "reserved_path") {
+          const el = document.getElementById("settingPathError");
+          el.textContent = t("pathReserved");
+          el.classList.add("show");
+          throw new Error(t("pathReserved"));
+        }
+        if (body.error === "invalid_path") {
+          const el = document.getElementById("settingPathError");
+          el.textContent = t("pathInvalid");
+          el.classList.add("show");
+          throw new Error(t("pathInvalid"));
+        }
+        throw new Error(body.error || "HTTP " + res.status);
+      }
+      return body;
+    })
+    .then((body) => {
+      showSettingsMessage(t("saveSuccess"), "success");
+      STATE.dashboardPath = body.dashboard_path || STATE.dashboardPath;
+      setTimeout(() => {
+        if (pathChanged) {
+          window.location.href = "/" + STATE.dashboardPath;
+          return;
+        }
+        closeSettings();
+        fetchTraffic();
+      }, 700);
+    })
+    .catch((err) => {
+      if (!settingsMsg.classList.contains("show") || settingsMsg.className.indexOf("error") === -1) {
+        showSettingsMessage(err.message, "error");
+      }
+    });
+}
+
+/* ============================================================
+   API
+   ============================================================ */
+function showErrorBanner(msg) {
+  const el = document.getElementById("errorBanner");
+  el.textContent = msg;
+  el.classList.add("show");
+}
+
+function hideErrorBanner() {
+  document.getElementById("errorBanner").classList.remove("show");
+}
+
+function fetchTraffic() {
+  fetch(API_TRAFFIC, { cache: "no-store" })
+    .then(async (res) => {
+      if (res.status === 401 || res.status === 302) {
+        window.location.href = "/" + STATE.dashboardPath;
+        return null;
+      }
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body) {
+        throw new Error((body && body.error) || "HTTP " + res.status);
+      }
+      return body;
+    })
+    .then((data) => {
+      if (!data) return;
+      hideErrorBanner();
+      STATE.lastData = data;
+      renderAll(data);
+    })
+    .catch((err) => {
+      showErrorBanner(t("loadError") + ": " + err.message);
+    });
+}
+
+/* ============================================================
+   START
+   ============================================================ */
+function bindEvents() {
+  document.getElementById("langSelect").addEventListener("change", (e) => setLanguage(e.target.value));
+  document.getElementById("themeBtn").addEventListener("click", toggleTheme);
+  document.getElementById("settingsBtn").addEventListener("click", openSettings);
+  document.getElementById("settingsCloseBtn").addEventListener("click", closeSettings);
+  document.getElementById("settingsCancelBtn").addEventListener("click", closeSettings);
+  document.getElementById("settingsSaveBtn").addEventListener("click", saveSettings);
+
+  settingsModal.addEventListener("click", (e) => {
+    if (e.target === settingsModal) closeSettings();
+  });
+
+  document.querySelectorAll("[data-crange]").forEach((btn) => {
+    btn.addEventListener("click", () => setChartRange(btn.dataset.crange));
+  });
+
+  document.querySelectorAll("[data-hrange]").forEach((btn) => {
+    btn.addEventListener("click", () => setHistoryRange(btn.dataset.hrange));
+  });
+
+  document.querySelectorAll("[data-panel]").forEach((btn) => {
+    btn.addEventListener("click", () => setPanel(btn.dataset.panel));
+  });
+}
+
+function init() {
+  applyTheme();
+  applyLanguage();
+  bindEvents();
+  fetchTraffic();
+  setInterval(fetchTraffic, REFRESH_INTERVAL_MS);
+}
+
+init();
+</script>
+</body>
+</html>
