@@ -17,15 +17,20 @@
     })();
   </script>
 </head>
-<body dir="ltr">
-  <div class="login-topbar">
-    <div class="lang-select-wrap">
-      <select class="lang-select" id="langSelect" aria-label="Language">
-        <option value="en">English</option>
-        <option value="fa">فارسی</option>
-        <option value="zh">中文</option>
-        <option value="ru">Русский</option>
-      </select>
+<body dir="ltr" data-lang="en">
+
+  <div class="topbar">
+    <div class="lang-menu" id="langMenu">
+      <button class="lang-trigger" id="langTrigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+        <span id="langTriggerLabel">EN</span>
+        <svg class="lang-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="lang-dropdown" id="langDropdown" role="listbox">
+        <button class="lang-option" data-lang="en" role="option"><span>English</span><span class="dot"></span></button>
+        <button class="lang-option" data-lang="fa" role="option"><span>فارسی</span><span class="dot"></span></button>
+        <button class="lang-option" data-lang="zh" role="option"><span>中文</span><span class="dot"></span></button>
+        <button class="lang-option" data-lang="ru" role="option"><span>Русский</span><span class="dot"></span></button>
+      </div>
     </div>
     <button class="icon-btn" id="themeBtn" type="button" title="Toggle theme">&#9789;</button>
   </div>
@@ -64,6 +69,7 @@
   <script>
     const LANG_CYCLE = ["en", "fa", "zh", "ru"];
     const RTL_LANGS = ["fa"];
+    const LANG_SHORT = { en: "EN", fa: "فا", zh: "中文", ru: "RU" };
 
     const LOGIN_TRANSLATIONS = {
       en: {
@@ -104,6 +110,14 @@
       },
     };
 
+    /* Convert any Latin digits inside a string to Persian digits.
+       Used so that Farsi mode has no leftover Western numerals
+       anywhere on the page (e.g. inside dynamic content). */
+    const FA_DIGITS = ["۰","۱","۲","۳","۴","۵","۶","۷","۸","۹"];
+    function toFaDigits(str) {
+      return String(str).replace(/[0-9]/g, (d) => FA_DIGITS[+d]);
+    }
+
     let lang = localStorage.getItem("dashboard_lang") || "en";
     if (!LANG_CYCLE.includes(lang)) lang = "en";
 
@@ -114,7 +128,13 @@
     function applyLoginLanguage() {
       const isRtl = RTL_LANGS.includes(lang);
       document.body.setAttribute("dir", isRtl ? "rtl" : "ltr");
-      document.getElementById("langSelect").value = lang;
+      document.body.setAttribute("data-lang", lang);
+
+      document.getElementById("langTriggerLabel").textContent = isRtl ? toFaDigits(LANG_SHORT[lang]) : LANG_SHORT[lang];
+      document.querySelectorAll(".lang-option").forEach((opt) => {
+        opt.classList.toggle("active", opt.dataset.lang === lang);
+      });
+
       document.getElementById("loginTitle").textContent = t("title");
       document.title = t("title");
       document.getElementById("loginSubtitle").textContent = t("subtitle");
@@ -131,6 +151,7 @@
       lang = newLang;
       localStorage.setItem("dashboard_lang", lang);
       applyLoginLanguage();
+      closeLangMenu();
     }
 
     function applyLoginTheme(theme) {
@@ -145,7 +166,38 @@
       applyLoginTheme(next);
     }
 
-    document.getElementById("langSelect").addEventListener("change", (e) => setLoginLanguage(e.target.value));
+    /* ---- language menu open/close (replaces native <select>) ---- */
+    const langMenu = document.getElementById("langMenu");
+    const langTrigger = document.getElementById("langTrigger");
+
+    function openLangMenu() {
+      langMenu.classList.add("open");
+      langTrigger.setAttribute("aria-expanded", "true");
+    }
+    function closeLangMenu() {
+      langMenu.classList.remove("open");
+      langTrigger.setAttribute("aria-expanded", "false");
+    }
+    function toggleLangMenu() {
+      langMenu.classList.contains("open") ? closeLangMenu() : openLangMenu();
+    }
+
+    langTrigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleLangMenu();
+    });
+
+    document.querySelectorAll(".lang-option").forEach((opt) => {
+      opt.addEventListener("click", () => setLoginLanguage(opt.dataset.lang));
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!langMenu.contains(e.target)) closeLangMenu();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeLangMenu();
+    });
+
     document.getElementById("themeBtn").addEventListener("click", toggleLoginTheme);
 
     applyLoginTheme(localStorage.getItem("dashboard_theme") || "light");
