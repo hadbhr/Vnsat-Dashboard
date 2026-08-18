@@ -495,7 +495,7 @@ echo -e "${c_bold}${c_green}=== Installation completed successfully ===${c_reset
 echo
 
 # ---- Green info box with connection details ----
-box_line1="Dashboard URL:  https://${SERVER_NAME}:${EXTERNAL_PORT}/login"
+box_line1="Dashboard URL:  https://${SERVER_NAME}:${EXTERNAL_PORT}/dashboard"
 box_line2="Username:       ${DASH_USERNAME}"
 box_line3="Password:       (the one you entered)"
 
