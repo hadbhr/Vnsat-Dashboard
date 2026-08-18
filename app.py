@@ -360,16 +360,24 @@ def get_traffic(cfg):
         "hourly_history": [],
         "weekly_history": [],
         "monthly_history": [],
+        "warning": None,
     }
 
     data = run_vnstat_json()
     if not data:
-        return empty_result
+        result = dict(empty_result)
+        result["warning"] = (
+            "Could not read vnStat data (binary not found, permission issue, "
+            "or vnStat error). Check server logs (journalctl -u vps-dashboard)."
+        )
+        return result
 
     iface = select_interface(data, cfg)
     if not iface:
         logger.error("No usable interface found in vnstat data")
-        return empty_result
+        result = dict(empty_result)
+        result["warning"] = "No usable network interface found in vnStat data."
+        return result
 
     traffic = iface.get("traffic", {}) or {}
     iface_name = iface.get("name", cfg.get("interface", "") or "unknown")
@@ -465,9 +473,16 @@ def get_traffic(cfg):
     hourly_history = []
     for h_entry in hour_entries:
         d = h_entry.get("date", {}) or {}
+        t = h_entry.get("time", {}) or {}
         try:
             entry_date = date(int(d.get("year")), int(d.get("month")), int(d.get("day")))
-            hour_val = int(h_entry.get("hour", 0))
+            # vnStat >= 2.x nests the hour under "time": {"hour": N}.
+            # Fall back to a top-level "hour" key for older vnStat versions
+            # that put it directly on the entry.
+            if "hour" in t:
+                hour_val = int(t.get("hour", 0))
+            else:
+                hour_val = int(h_entry.get("hour", 0))
         except (TypeError, ValueError, KeyError):
             continue
         rx_gb, tx_gb = _rx_tx_gb(h_entry)
@@ -522,6 +537,7 @@ def get_traffic(cfg):
         "hourly_history": hourly_history,
         "weekly_history": weekly_history,
         "monthly_history": monthly_history,
+        "warning": None,
     }
 
 
@@ -548,6 +564,7 @@ def api_traffic():
             "hourly_history": traffic["hourly_history"],
             "weekly_history": traffic["weekly_history"],
             "monthly_history": traffic["monthly_history"],
+            "warning": traffic.get("warning"),
         }
         return jsonify(response), 200
     except Exception as exc:  # noqa: BLE001 - must never crash the app
