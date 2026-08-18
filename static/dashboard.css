@@ -902,3 +902,154 @@ body[dir="rtl"] .select-wrap select {
     font-size: 18px;
   }
 }
+
+/* ---------------- Custom language menu (replaces native select) ---------------- */
+
+.lang-menu { position: relative; direction: ltr; }
+
+.lang-trigger {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.lang-trigger:hover { border-color: var(--accent); color: var(--accent); }
+
+.lang-chevron { transition: transform 0.15s ease; flex-shrink: 0; }
+.lang-menu.open .lang-chevron { transform: rotate(180deg); }
+
+.lang-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 152px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 6px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 30;
+}
+
+.lang-menu.open .lang-dropdown { display: flex; }
+
+.lang-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-ui);
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 7px;
+  transition: background 0.12s ease;
+}
+
+.lang-option:hover { background: var(--accent-soft); }
+.lang-option.active { color: var(--accent); font-weight: 700; }
+
+.lang-option .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+}
+
+.lang-option.active .dot { opacity: 1; }
+
+body[dir="rtl"] .lang-option { text-align: right; }
+
+/* ---------------- Top-level page tabs (Details / Chart / History) ---------------- */
+
+.page-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+}
+
+.page-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: calc(var(--radius-sm) - 3px);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.page-tab.active {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.page-view { display: none; }
+.page-view.active { display: block; }
+
+@media (max-width: 480px) {
+  .page-tab { font-size: 12px; padding: 9px 6px; }
+}
+
+/* ---------------- Legend acting as an exclusive series filter ---------------- */
+
+.legend-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+.legend-btn:hover { border-color: var(--accent); }
+
+.legend-btn.selected {
+  border-color: var(--legend-color, var(--accent));
+  color: var(--text);
+  background: color-mix(in srgb, var(--legend-color, var(--accent)) 14%, transparent);
+}
+
+.legend.has-selection .legend-btn:not(.selected) { opacity: 0.45; }
+
+/* ---------------- Login top bar (fixed top-left controls) ---------------- */
+
+.topbar {
+  position: fixed;
+  top: 18px;
+  left: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 20;
+}
