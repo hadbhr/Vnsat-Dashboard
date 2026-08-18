@@ -22,7 +22,7 @@ Node.js, no React. Just Python + vanilla JS.
 Run this on a fresh Ubuntu/Debian VPS as root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hadbhr/Vnsat-Dashboard/main/install.sh | bash
 ```
 
 The installer will:
@@ -38,6 +38,12 @@ The installer will:
 7. Auto-renew the TLS certificate via a systemd timer (domain installs only)
 
 At the end you'll get a ready-to-use HTTPS URL and login credentials.
+
+to remove dashboard from your vps:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hadbhr/Vnsat-Dashboard/main/uninstall.sh | bash
+```
 
 ## Manual install
 
