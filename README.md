@@ -74,4 +74,4 @@ venv/bin/python create_user.py USERNAME
 
 ## License
 
-MIT — do whatever you want with it.
+MIT
